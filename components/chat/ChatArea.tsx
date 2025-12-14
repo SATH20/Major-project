@@ -82,15 +82,19 @@ export default function ChatArea({ sidebarOpen }: ChatAreaProps) {
     setLastContentType(contentType);
 
     try {
-      const url = contentType === 'Post'
-        ? 'http://localhost:8080/api/v1/executions/webhook/company.social.media/agentic_image_poster/my-image-secret'
-        : 'http://localhost:8080/api/v1/executions/webhook/company.social.agent/agentic_video_director/secret-key-123';
-
-      await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: message }),
-      });
+      if (contentType === 'Post') {
+        await fetch('http://localhost:8080/api/v1/executions/webhook/company.social.media/agentic_image_poster/my-image-secret', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: message }),
+        });
+      } else {
+        await fetch('http://localhost:8080/api/v1/executions/webhook/company.social.agent/agentic_video_director/secret-key-123', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: message }),
+        });
+      }
     } catch (error) {
       console.error('Error sending request:', error);
     }
