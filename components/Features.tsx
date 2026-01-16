@@ -1,94 +1,140 @@
 'use client';
 
-import { Bot, Shield, Layers, MessageSquare, TrendingUp, Check } from 'lucide-react';
-import { FacebookIcon, InstagramIcon, ConnectIcon } from './icons/SocialIcons';
+import { useEffect, useRef, useState } from 'react';
+import { Database, Scale, Brain, ScanEye, Lock, Zap } from 'lucide-react';
+
+const features = [
+  {
+    icon: Database,
+    title: 'Alternative Data Engine',
+    description: 'Analyze non-traditional data sources including digital footprint, transaction patterns, and behavioral signals to assess creditworthiness for thin-file borrowers.',
+    gradient: 'from-[#4F7FFF] to-[#6B8FFF]',
+  },
+  {
+    icon: Scale,
+    title: 'Bias-Reduced Scoring',
+    description: 'Our models are trained with fairness constraints to minimize demographic bias while maintaining predictive accuracy across all population segments.',
+    gradient: 'from-[#9B6BFF] to-[#B88BFF]',
+  },
+  {
+    icon: Brain,
+    title: 'Explainable AI (XAI)',
+    description: 'Every credit decision comes with a detailed explanation of contributing factors, enabling transparency and regulatory compliance.',
+    gradient: 'from-[#4F7FFF] to-[#9B6BFF]',
+  },
+  {
+    icon: ScanEye,
+    title: 'OCR Fraud Detection',
+    description: 'Advanced document verification using optical character recognition to detect forged documents and identity fraud in real-time.',
+    gradient: 'from-[#FF5C5C] to-[#FF8080]',
+  },
+  {
+    icon: Lock,
+    title: 'Secure Data Pipeline',
+    description: 'End-to-end encryption with no raw PII storage. Data is processed in secure enclaves with audit trails for compliance.',
+    gradient: 'from-[#2EE59D] to-[#5FFFB8]',
+  },
+  {
+    icon: Zap,
+    title: 'Real-Time Processing',
+    description: 'Sub-second credit decisions powered by optimized ML inference. Process thousands of applications simultaneously.',
+    gradient: 'from-[#FFB84D] to-[#FFD080]',
+  },
+];
 
 export default function Features() {
+  const [isVisible, setIsVisible] = useState(false);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (sectionRef.current) {
+      observer.observe(sectionRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <section id="features" className="py-24 px-6 max-w-7xl mx-auto z-10 relative">
+    <section id="features" ref={sectionRef} className="py-24 px-6 max-w-7xl mx-auto relative z-10">
       <div className="text-center mb-16">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything you need</h2>
-        <p className="text-gray-400">Built for creators and businesses who value their time.</p>
+        <span className="text-[#4F7FFF] text-sm font-semibold tracking-wider uppercase mb-4 block">
+          Core Capabilities
+        </span>
+        <h2 className="text-3xl md:text-5xl font-bold mb-4 font-[family-name:var(--font-space)]">
+          Built for <span className="gradient-text">Modern Lending</span>
+        </h2>
+        <p className="text-[#8A8FA3] max-w-2xl mx-auto">
+          Enterprise-grade features designed for accuracy, fairness, and regulatory compliance.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <AIContentCard />
-        <ConnectCard />
-        <FeatureCard icon={Layers} title="Smart Storage" description="Store, organize, and serve large files, from videos to images instantly." />
-        <FeatureCard icon={MessageSquare} title="Realtime Chat" description="Build multiplayer experiences. Respond to comments and DMs from one dashboard." />
-        <FeatureCard icon={TrendingUp} title="Trend Vector" description="Integrate favorite ML-models to store, index and search vector embeddings for trends." />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {features.map((feature, index) => {
+          const Icon = feature.icon;
+          const isHovered = hoveredIndex === index;
+
+          return (
+            <div
+              key={feature.title}
+              className={`glass-card rounded-2xl p-8 relative overflow-hidden cursor-pointer transition-all duration-500 ${
+                isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+              }`}
+              style={{ transitionDelay: `${index * 100}ms` }}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              {/* Gradient glow on hover */}
+              <div 
+                className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 transition-opacity duration-300 ${
+                  isHovered ? 'opacity-5' : ''
+                }`}
+              />
+
+              {/* Top border glow */}
+              <div 
+                className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${feature.gradient} transition-opacity duration-300 ${
+                  isHovered ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+
+              <div className="relative z-10">
+                {/* Icon */}
+                <div 
+                  className={`w-14 h-14 rounded-xl mb-6 flex items-center justify-center bg-gradient-to-br ${feature.gradient} transition-transform duration-300 ${
+                    isHovered ? 'scale-110' : ''
+                  }`}
+                >
+                  <Icon size={24} className="text-white" />
+                </div>
+
+                {/* Content */}
+                <h3 className="text-xl font-semibold text-[#E8EBF3] mb-3">{feature.title}</h3>
+                <p className="text-[#8A8FA3] text-sm leading-relaxed">{feature.description}</p>
+
+                {/* Learn more link */}
+                <div 
+                  className={`mt-6 flex items-center gap-2 text-sm font-medium transition-all duration-300 ${
+                    isHovered ? 'text-[#4F7FFF] translate-x-2' : 'text-[#8A8FA3]'
+                  }`}
+                >
+                  <span>Learn more</span>
+                  <span className="text-lg">→</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
-  );
-}
-
-function AIContentCard() {
-  return (
-    <div className="md:col-span-2 bg-[#1c1c1c] border border-white/10 rounded-xl p-8 hover:border-[#3ECF8E]/50 transition-colors group relative overflow-hidden">
-      <div className="relative z-10">
-        <div className="w-10 h-10 bg-[#232323] rounded flex items-center justify-center mb-6 text-[#3ECF8E] border border-white/5 group-hover:bg-[#3ECF8E] group-hover:text-black transition-colors">
-          <Bot size={20} />
-        </div>
-        <h3 className="text-xl font-bold mb-2 text-white">AI Content Creation</h3>
-        <p className="text-gray-400 max-w-md">Every post is a full production. Generates posts, reels, with hashtags and captions that match your brand voice accurately.</p>
-        
-        <div className="mt-8 space-y-2 text-sm text-gray-400">
-          <div className="flex items-center gap-2"><Check size={16} className="text-[#3ECF8E]"/> 100% Brand Safe</div>
-          <div className="flex items-center gap-2"><Check size={16} className="text-[#3ECF8E]"/> Built-in Tone Matching</div>
-          <div className="flex items-center gap-2"><Check size={16} className="text-[#3ECF8E]"/> Easy to extend</div>
-        </div>
-      </div>
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1/3 h-3/4 opacity-10 group-hover:opacity-20 transition-opacity">
-        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-          <path fill="#3ECF8E" d="M44.7,-76.4C58.9,-69.2,71.8,-59.1,81.6,-46.6C91.4,-34.1,98.1,-19.2,95.8,-4.9C93.5,9.3,82.2,22.9,71,34.4C59.9,45.9,48.9,55.3,36.5,62.8C24.1,70.3,10.2,75.9,-2.8,80.7C-15.8,85.5,-27.9,89.5,-39.1,84.9C-50.3,80.3,-60.5,67.1,-69.3,53.4C-78.1,39.7,-85.5,25.5,-85.9,11.1C-86.3,-3.3,-79.7,-17.9,-70.7,-30.8C-61.7,-43.7,-50.3,-54.9,-37.8,-63.1C-25.3,-71.3,-11.7,-76.5,2.1,-80.1C15.9,-83.7,30.5,-63.6,44.7,-76.4Z" transform="translate(100 100)" />
-        </svg>
-      </div>
-    </div>
-  );
-}
-
-function ConnectCard() {
-  return (
-    <div className="bg-[#1c1c1c] border border-white/10 rounded-xl p-8 hover:border-[#3ECF8E]/50 transition-colors group">
-      <div className="w-10 h-10 bg-[#232323] rounded flex items-center justify-center mb-6 text-[#3ECF8E] border border-white/5 group-hover:bg-[#3ECF8E] group-hover:text-black transition-colors">
-        <Shield size={20} />
-      </div>
-      <h3 className="text-xl font-bold mb-2 text-white">Connect and Get Started</h3>
-      <p className="text-gray-400 mb-6">Connect your Facebook and Instagram to start automating your online presence</p>
-      
-      <div className="bg-black/40 rounded border border-white/5 p-4 space-y-4">
-        <SocialConnectRow icon={FacebookIcon} name="Facebook" />
-        <div className="h-px bg-white/5 w-full"></div>
-        <SocialConnectRow icon={InstagramIcon} name="Instagram" />
-      </div>
-    </div>
-  );
-}
-
-function SocialConnectRow({ icon: Icon, name }: { icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; name: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="p-1">
-          <Icon className="text-xl text-gray-300 w-5 h-5" />
-        </div>
-        <span className="text-sm font-medium text-gray-300">{name}</span>
-      </div>
-      <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 text-white hover:bg-[#3ECF8E]/20 transition-all cursor-pointer">
-        <ConnectIcon className="text-lg text-[#3ECF8E] w-4 h-4" />
-      </button>
-    </div>
-  );
-}
-
-function FeatureCard({ icon: Icon, title, description }: { icon: React.ComponentType<{ size?: number }>; title: string; description: string }) {
-  return (
-    <div className="bg-[#1c1c1c] border border-white/10 rounded-xl p-8 hover:border-[#3ECF8E]/50 transition-colors group">
-      <div className="w-10 h-10 bg-[#232323] rounded flex items-center justify-center mb-6 text-[#3ECF8E] border border-white/5 group-hover:bg-[#3ECF8E] group-hover:text-black transition-colors">
-        <Icon size={20} />
-      </div>
-      <h3 className="text-xl font-bold mb-2 text-white">{title}</h3>
-      <p className="text-gray-400">{description}</p>
-    </div>
   );
 }

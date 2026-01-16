@@ -1,178 +1,283 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Send, Plus, ChevronDown, Check, ImageIcon, Film, CheckCircle } from 'lucide-react';
-import { FacebookIcon, InstagramIcon } from '../icons/SocialIcons';
+import { useState, useEffect, useRef } from 'react';
+import { Send, Shield, Cpu, Zap, Tag, Brain } from 'lucide-react';
+import QuickChips from './QuickChips';
+import RiskResultCard from './RiskResultCard';
+import FraudResultCard from './FraudResultCard';
+import ExplainabilityCard from './ExplainabilityCard';
+import ModelComparisonCard from './ModelComparisonCard';
+import PipelineLoader from './PipelineLoader';
 
 interface ChatAreaProps {
   sidebarOpen: boolean;
 }
 
-type LoadingStep = {
-  label: string;
-  completed: boolean;
-};
+interface Message {
+  id: string;
+  type: 'user' | 'assistant';
+  content: string;
+  cardType?: 'risk' | 'fraud' | 'explain' | 'compare' | 'loading';
+  data?: any;
+  timestamp: Date;
+}
 
-export default function ChatArea({ sidebarOpen }: ChatAreaProps) {
+// Mock data generators
+const generateRiskData = () => ({
+  score: Math.floor(Math.random() * 300) + 550,
+  approvalProbability: Math.floor(Math.random() * 30) + 65,
+  riskBand: Math.random() > 0.6 ? 'Low' : Math.random() > 0.3 ? 'Medium' : 'High' as 'Low' | 'Medium' | 'High',
+  modelUsed: 'Gradient Boosting Ensemble v2.4',
+  confidence: Math.floor(Math.random() * 10) + 88,
+});
+
+const generateFraudData = () => ({
+  fraudProbability: Math.random() * 15 + 1,
+  flags: Math.random() > 0.7 ? ['Document age mismatch', 'Unusual pattern'] : [],
+  extractedFields: [
+    { label: 'Full Name', value: 'John Smith', masked: false },
+    { label: 'ID Number', value: '1234567890', masked: true },
+    { label: 'Date of Birth', value: '1990-05-15', masked: false },
+    { label: 'Address', value: '123 Main St, City', masked: false },
+    { label: 'Income', value: '$75,000', masked: false },
+    { label: 'Employer', value: 'Tech Corp Inc.', masked: false },
+  ],
+});
+
+const generateExplainData = () => ({
+  factors: [
+    { name: 'Payment History', impact: 'positive' as const, value: 35, description: 'Consistent on-time payments across all accounts for the past 24 months.' },
+    { name: 'Credit Utilization', impact: 'positive' as const, value: 25, description: 'Low utilization ratio of 23%, well below the recommended 30% threshold.' },
+    { name: 'Account Age', impact: 'neutral' as const, value: 15, description: 'Average account age of 2.3 years. Longer history would improve score.' },
+    { name: 'Income Stability', impact: 'positive' as const, value: 12, description: 'Stable employment for 18+ months with consistent income growth.' },
+    { name: 'Debt-to-Income', impact: 'negative' as const, value: 8, description: 'DTI ratio of 38% is slightly above the optimal 35% threshold.' },
+    { name: 'Recent Inquiries', impact: 'neutral' as const, value: 5, description: '2 hard inquiries in the last 6 months from credit applications.' },
+  ],
+  decisionSummary: 'The applicant demonstrates strong creditworthiness based on consistent payment history and responsible credit utilization. The primary positive factors are the excellent payment track record (35% weight) and low credit utilization (25% weight). The slightly elevated debt-to-income ratio (8% negative impact) is the main area for improvement. Overall, the risk profile supports approval with standard terms.',
+});
+
+const generateCompareData = () => ({
+  models: [
+    { name: 'Logistic Regression', accuracy: 89.2, explainability: 95, latency: '12ms', recommended: false },
+    { name: 'Random Forest', accuracy: 94.1, explainability: 72, latency: '45ms', recommended: false },
+    { name: 'Gradient Boosting', accuracy: 96.8, explainability: 85, latency: '38ms', recommended: true },
+  ],
+});
+
+export default function ChatArea({ sidebarOpen: _sidebarOpen }: ChatAreaProps) {
   const [message, setMessage] = useState('');
-  const [contentType, setContentType] = useState<'Post' | 'Reel'>('Post');
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingSteps, setLoadingSteps] = useState<LoadingStep[]>([]);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [lastContentType, setLastContentType] = useState<'Post' | 'Reel'>('Post');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [pipelineStep, setPipelineStep] = useState(0);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const username = 'Khushal Agarwal';
-
-  const getStepsForType = (type: 'Post' | 'Reel'): LoadingStep[] => {
-    if (type === 'Post') {
-      return [
-        { label: 'Received request', completed: false },
-        { label: 'Enhancing the prompt', completed: false },
-        { label: 'Generating the image', completed: false },
-        { label: 'Generating a caption', completed: false },
-        { label: 'Posting the content', completed: false },
-      ];
+  // Load chat history from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('lendnova_chat_history');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      setMessages(parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })));
     }
-    return [
-      { label: 'Received request', completed: false },
-      { label: 'Enhancing the prompt', completed: false },
-      { label: 'Generating the video', completed: false },
-      { label: 'Adding audio', completed: false },
-      { label: 'Generating a caption', completed: false },
-      { label: 'Posting the content', completed: false },
-    ];
+  }, []);
+
+  // Save chat history to localStorage
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem('lendnova_chat_history', JSON.stringify(messages));
+    }
+  }, [messages]);
+
+  // Scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleChipClick = (template: string) => {
+    setMessage(template);
   };
 
-  useEffect(() => {
-    if (!isLoading || currentStepIndex >= loadingSteps.length) return;
+  const simulatePipeline = async (cardType: 'risk' | 'fraud' | 'explain' | 'compare') => {
+    setIsProcessing(true);
+    setPipelineStep(0);
 
-    const timer = setTimeout(() => {
-      setLoadingSteps(prev => 
-        prev.map((step, idx) => 
-          idx === currentStepIndex ? { ...step, completed: true } : step
-        )
-      );
-      setCurrentStepIndex(prev => prev + 1);
-    }, 15000);
+    // Add loading message with unique ID
+    const loadingId = `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    setMessages(prev => [...prev, {
+      id: loadingId,
+      type: 'assistant',
+      content: 'Processing...',
+      cardType: 'loading',
+      timestamp: new Date(),
+    }]);
 
-    return () => clearTimeout(timer);
-  }, [isLoading, currentStepIndex, loadingSteps.length]);
-
-  useEffect(() => {
-    if (isLoading && currentStepIndex >= loadingSteps.length && loadingSteps.length > 0) {
-      setTimeout(() => {
-        setIsLoading(false);
-        setLoadingSteps([]);
-        setCurrentStepIndex(0);
-        setShowSuccess(true);
-      }, 1000);
+    // Simulate pipeline steps
+    for (let i = 0; i < 5; i++) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setPipelineStep(i);
     }
-  }, [currentStepIndex, loadingSteps.length, isLoading]);
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Generate result data
+    let data: any;
+    switch (cardType) {
+      case 'risk': data = generateRiskData(); break;
+      case 'fraud': data = generateFraudData(); break;
+      case 'explain': data = generateExplainData(); break;
+      case 'compare': data = generateCompareData(); break;
+    }
+
+    // Replace loading with result
+    setMessages(prev => prev.map(m => 
+      m.id === loadingId 
+        ? { ...m, content: 'Analysis complete', cardType, data }
+        : m
+    ));
+
+    setIsProcessing(false);
+    setPipelineStep(0);
+  };
 
   const handleSend = async () => {
     if (!message.trim()) return;
 
-    const steps = getStepsForType(contentType);
-    setLoadingSteps(steps);
-    setCurrentStepIndex(0);
-    setIsLoading(true);
-    setShowSuccess(false);
-    setLastContentType(contentType);
+    // Add user message with unique ID
+    const userMessage: Message = {
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      type: 'user',
+      content: message,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+    const currentMessage = message;
+    setMessage('');
 
-    try {
-      if (contentType === 'Post') {
-        await fetch('http://localhost:8080/api/v1/executions/webhook/company.social.media/agentic_image_poster/my-image-secret', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: message }),
-        });
-      } else {
-        await fetch('http://localhost:8080/api/v1/executions/webhook/company.social.agent/agentic_video_director/secret-key-123', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: message }),
-        });
-      }
-    } catch (error) {
-      console.error('Error sending request:', error);
+    // Intelligently determine card type based on message content
+    let cardType: 'risk' | 'fraud' | 'explain' | 'compare' = 'risk';
+    const lowerMessage = currentMessage.toLowerCase();
+    
+    if (lowerMessage.includes('fraud') || lowerMessage.includes('ocr') || lowerMessage.includes('document') || lowerMessage.includes('upload') || lowerMessage.includes('verify')) {
+      cardType = 'fraud';
+    } else if (lowerMessage.includes('explain') || lowerMessage.includes('why') || lowerMessage.includes('factor') || lowerMessage.includes('reason')) {
+      cardType = 'explain';
+    } else if (lowerMessage.includes('compare') || lowerMessage.includes('model') || lowerMessage.includes('accuracy')) {
+      cardType = 'compare';
     }
 
-    setMessage('');
+    await simulatePipeline(cardType);
   };
 
-  const renderContent = () => {
-    if (isLoading) {
-      return <LoadingView steps={loadingSteps} currentStepIndex={currentStepIndex} contentType={contentType} />;
+  const handleExplain = () => simulatePipeline('explain');
+  const handleCompare = () => simulatePipeline('compare');
+
+  const renderMessage = (msg: Message) => {
+    if (msg.type === 'user') {
+      return (
+        <div key={msg.id} className="flex justify-end mb-4 animate-fadeIn">
+          <div className="max-w-xl glass-card rounded-2xl rounded-tr-sm px-4 py-3">
+            <p className="text-[#E8EBF3]">{msg.content}</p>
+            <p className="text-xs text-[#8A8FA3] mt-1">{msg.timestamp.toLocaleTimeString()}</p>
+          </div>
+        </div>
+      );
     }
-    if (showSuccess) {
-      return <SuccessCard contentType={lastContentType} onDismiss={() => setShowSuccess(false)} />;
+
+    if (msg.cardType === 'loading') {
+      return (
+        <div key={msg.id} className="mb-4 max-w-2xl">
+          <PipelineLoader currentStep={pipelineStep} />
+        </div>
+      );
     }
-    return <WelcomeMessage username={username} />;
+
+    return (
+      <div key={msg.id} className="mb-4 max-w-2xl">
+        {msg.cardType === 'risk' && msg.data && (
+          <RiskResultCard 
+            {...msg.data}
+            onExplain={handleExplain}
+            onCompare={handleCompare}
+          />
+        )}
+        {msg.cardType === 'fraud' && msg.data && (
+          <FraudResultCard 
+            {...msg.data}
+            onViewExtracted={() => {}}
+            onRerunOCR={() => simulatePipeline('fraud')}
+            onMarkVerified={() => {}}
+          />
+        )}
+        {msg.cardType === 'explain' && msg.data && (
+          <ExplainabilityCard {...msg.data} />
+        )}
+        {msg.cardType === 'compare' && msg.data && (
+          <ModelComparisonCard {...msg.data} />
+        )}
+      </div>
+    );
   };
 
   return (
-    <main className={`flex-1 flex flex-col h-screen overflow-hidden ${sidebarOpen ? '' : ''}`}>
+    <main className="flex-1 flex flex-col h-screen overflow-hidden relative z-10">
+      {/* Chat Messages Area */}
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="min-h-full flex items-center justify-center">
-          {renderContent()}
-        </div>
+        {messages.length === 0 ? (
+          <div className="min-h-full flex items-center justify-center">
+            <WelcomeScreen />
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto">
+            {messages.map(renderMessage)}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
       </div>
 
-      <div className="p-6 pb-8">
-        <div className="max-w-3xl mx-auto">
-          <div className="bg-[#1c1c1c] border border-white/10 rounded-xl p-3 flex items-center gap-3 focus-within:border-[#3ECF8E]/50 transition-colors">
-            <button className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#232323] text-gray-400 hover:text-[#3ECF8E] hover:bg-[#3ECF8E]/10 transition-colors border border-white/5">
-              <Plus size={20} />
-            </button>
+      {/* Input Area - Clean & Minimal */}
+      <div className="p-4 pb-6">
+        <div className="max-w-2xl mx-auto">
+          <QuickChips onChipClick={handleChipClick} />
+          
+          <div className="relative">
+            {/* Glow effect behind input */}
+            <div className="absolute inset-0 bg-gradient-to-r from-[#4F7FFF]/20 via-[#9B6BFF]/20 to-[#4F7FFF]/20 rounded-2xl blur-xl opacity-50" />
+            
+            <div className="relative glass-card rounded-2xl p-2 flex items-center gap-2">
+              <input
+                type="text"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !isProcessing && handleSend()}
+                placeholder="Describe borrower or ask a question..."
+                className="flex-1 bg-transparent text-[#E8EBF3] placeholder-[#8A8FA3] outline-none text-sm px-4 py-3"
+                disabled={isProcessing}
+              />
 
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Command Sento"
-              className="flex-1 bg-transparent text-white placeholder-gray-500 outline-none text-base"
-              disabled={isLoading}
-            />
-
-            <div className="relative">
+              {/* Send Button */}
               <button 
-                onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#232323] text-gray-300 hover:text-[#3ECF8E] transition-colors border border-white/5 text-sm font-medium"
-                disabled={isLoading}
+                onClick={handleSend}
+                disabled={isProcessing}
+                className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#4F7FFF] to-[#9B6BFF] text-white font-medium text-sm hover:shadow-lg hover:shadow-[#4F7FFF]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 group"
               >
-                {contentType}
-                <ChevronDown size={16} className={`transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                {isProcessing ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Analyzing</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                    <span>Analyze</span>
+                  </>
+                )}
               </button>
-              
-              {dropdownOpen && (
-                <div className="absolute bottom-full mb-2 right-0 bg-[#232323] border border-white/10 rounded-lg overflow-hidden shadow-xl min-w-[100px]">
-                  <button 
-                    onClick={() => { setContentType('Post'); setDropdownOpen(false); }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-[#3ECF8E]/10 hover:text-[#3ECF8E] transition-colors ${contentType === 'Post' ? 'text-[#3ECF8E]' : 'text-gray-300'}`}
-                  >
-                    Post
-                  </button>
-                  <button 
-                    onClick={() => { setContentType('Reel'); setDropdownOpen(false); }}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-[#3ECF8E]/10 hover:text-[#3ECF8E] transition-colors ${contentType === 'Reel' ? 'text-[#3ECF8E]' : 'text-gray-300'}`}
-                  >
-                    Reel
-                  </button>
-                </div>
-              )}
             </div>
-
-            <button 
-              onClick={handleSend}
-              disabled={isLoading || !message.trim()}
-              className="w-10 h-10 flex items-center justify-center rounded-lg bg-[#3ECF8E] text-[#121212] hover:bg-[#34b27b] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send size={18} />
-            </button>
           </div>
+          
+          {/* Subtle hint */}
+          <p className="text-center text-xs text-[#8A8FA3]/60 mt-3">
+            Press Enter to send • AI-powered credit analysis
+          </p>
         </div>
       </div>
     </main>
@@ -180,165 +285,79 @@ export default function ChatArea({ sidebarOpen }: ChatAreaProps) {
 }
 
 
-interface SuccessCardProps {
-  contentType: 'Post' | 'Reel';
-  onDismiss: () => void;
-}
-
-function SuccessCard({ contentType, onDismiss }: SuccessCardProps) {
-  return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="rounded-xl border border-[#3ECF8E]/30 bg-[#1c1c1c] overflow-hidden shadow-2xl">
-        <div className="p-6 text-center">
-          <div className="w-16 h-16 bg-[#3ECF8E]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={32} className="text-[#3ECF8E]" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Content Posted!</h2>
-          <p className="text-gray-400 mb-6">Your {contentType.toLowerCase()} has been successfully published.</p>
-          
-          <div className="flex items-center justify-center gap-4 mb-6">
-            <div className="flex items-center gap-2 px-4 py-2 bg-[#232323] rounded-lg border border-white/10">
-              <InstagramIcon className="w-5 h-5 text-pink-500" />
-              <span className="text-sm text-gray-300">Instagram</span>
-              <Check size={14} className="text-[#3ECF8E]" />
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 bg-[#232323] rounded-lg border border-white/10">
-              <FacebookIcon className="w-5 h-5 text-blue-500" />
-              <span className="text-sm text-gray-300">Facebook</span>
-              <Check size={14} className="text-[#3ECF8E]" />
-            </div>
-          </div>
-
-          <button 
-            onClick={onDismiss}
-            className="w-full py-3 bg-[#3ECF8E] text-[#121212] rounded-lg font-bold hover:bg-[#34b27b] transition-colors"
-          >
-            Create Another
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface LoadingViewProps {
-  steps: LoadingStep[];
-  currentStepIndex: number;
-  contentType: 'Post' | 'Reel';
-}
-
-function LoadingView({ steps, currentStepIndex, contentType }: LoadingViewProps) {
-  return (
-    <div className="w-full max-w-3xl mx-auto">
-      <div className="rounded-xl border border-white/10 bg-[#1c1c1c] overflow-hidden shadow-2xl relative">
-        <div className="absolute top-0 w-full h-1 bg-gradient-to-r from-transparent via-[#3ECF8E] to-transparent opacity-50"></div>
-        <div className="p-4 border-b border-white/10 flex gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500/20"></div>
-          <div className="w-3 h-3 rounded-full bg-yellow-500/20"></div>
-          <div className="w-3 h-3 rounded-full bg-green-500/20"></div>
-        </div>
-        
-        <div className="p-8 md:p-12">
-          <div className="space-y-2 mb-8">
-            <p className="text-[#3ECF8E] font-bold mb-4 font-mono">// Sento Output</p>
-            <div className="space-y-3">
-              {steps.map((step, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  {step.completed ? (
-                    <Check size={16} className="text-[#3ECF8E]" />
-                  ) : idx === currentStepIndex ? (
-                    <div className="w-4 h-4 border-2 border-[#3ECF8E] border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <div className="w-4 h-4 rounded-full border border-gray-600"></div>
-                  )}
-                  <span className={`text-sm ${step.completed ? 'text-gray-400' : idx === currentStepIndex ? 'text-white' : 'text-gray-600'}`}>
-                    {step.label}...
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <p className="text-[#3ECF8E] font-bold font-mono">// {contentType} Preview</p>
-            <ContentSkeleton contentType={contentType} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ContentSkeleton({ contentType }: { contentType: 'Post' | 'Reel' }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-[#232323] overflow-hidden max-w-[200px]">
-      <div className="relative aspect-square bg-[#1a1a1a] overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-[#1a1a1a] via-[#2a2a2a] to-[#1a1a1a] animate-shimmer"></div>
-        <div className="absolute inset-0 flex items-center justify-center">
-          {contentType === 'Post' ? (
-            <ImageIcon size={32} className="text-gray-700" />
-          ) : (
-            <Film size={32} className="text-gray-700" />
-          )}
-        </div>
-      </div>
-      
-      <div className="p-3 space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-[#1a1a1a] animate-pulse"></div>
-          <div className="h-2 w-16 bg-[#1a1a1a] rounded animate-pulse"></div>
-        </div>
-        <div className="space-y-1.5">
-          <div className="h-2 w-full bg-[#1a1a1a] rounded animate-pulse"></div>
-          <div className="h-2 w-3/4 bg-[#1a1a1a] rounded animate-pulse"></div>
-        </div>
-        <div className="flex gap-1.5 pt-1">
-          <div className="h-2 w-10 bg-[#3ECF8E]/20 rounded animate-pulse"></div>
-          <div className="h-2 w-12 bg-[#3ECF8E]/20 rounded animate-pulse"></div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function WelcomeMessage({ username }: { username: string }) {
-  const [displayedText, setDisplayedText] = useState('');
-  const [showSubtext, setShowSubtext] = useState(false);
-  const fullText = `Hi ${username}`;
+function WelcomeScreen() {
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    let index = 0;
-    setDisplayedText('');
-    setShowSubtext(false);
-    
-    const timer = setInterval(() => {
-      if (index < fullText.length) {
-        setDisplayedText(fullText.slice(0, index + 1));
-        index++;
-      } else {
-        clearInterval(timer);
-        setTimeout(() => setShowSubtext(true), 300);
-      }
-    }, 80);
-
-    return () => clearInterval(timer);
-  }, [fullText]);
+    setMounted(true);
+  }, []);
 
   return (
-    <div className="text-center">
-      <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-        {displayedText.startsWith('Hi ') ? (
-          <>
-            Hi <span className="text-[#3ECF8E]">{displayedText.slice(3)}</span>
-          </>
-        ) : (
-          displayedText
-        )}
-        <span className="animate-pulse">|</span>
+    <div className={`text-center max-w-2xl transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+      {/* Logo */}
+      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#4F7FFF] to-[#9B6BFF] flex items-center justify-center mx-auto mb-6 animate-float">
+        <Brain size={40} className="text-white" />
+      </div>
+
+      {/* Title */}
+      <h1 className="text-4xl md:text-5xl font-bold mb-4 font-[family-name:var(--font-space)]">
+        <span className="gradient-text">LendNova</span> Risk Assistant
       </h1>
-      <p className={`text-xl md:text-2xl text-gray-400 transition-opacity duration-500 ${showSubtext ? 'opacity-100' : 'opacity-0'}`}>
-        What content should we post today?
+      
+      <p className="text-lg text-[#8A8FA3] mb-8 max-w-xl mx-auto">
+        Run credit risk scoring, OCR fraud checks, and explainable decisions.
       </p>
+
+      {/* Status Chips */}
+      <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
+        <StatusChip icon={Shield} label="Secure" color="#2EE59D" />
+        <StatusChip icon={Cpu} label="Model: Gradient Boosting" color="#9B6BFF" />
+        <StatusChip icon={Zap} label="Latency: Live" color="#4F7FFF" />
+        <StatusChip icon={Tag} label="v1.0" color="#8A8FA3" />
+      </div>
+
+      {/* Quick Start Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+        <QuickStartCard 
+          title="Run Assessment"
+          description="Enter borrower details to get instant credit risk scoring"
+          gradient="from-[#4F7FFF] to-[#6B8FFF]"
+        />
+        <QuickStartCard 
+          title="Upload Documents"
+          description="OCR-powered document verification and fraud detection"
+          gradient="from-[#9B6BFF] to-[#B88BFF]"
+        />
+        <QuickStartCard 
+          title="Explain Decisions"
+          description="Understand the factors behind every credit decision"
+          gradient="from-[#2EE59D] to-[#5FFFB8]"
+        />
+      </div>
+    </div>
+  );
+}
+
+function StatusChip({ icon: Icon, label, color }: { icon: any; label: string; color: string }) {
+  return (
+    <div 
+      className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass text-sm"
+      style={{ borderColor: `${color}30` }}
+    >
+      <Icon size={14} style={{ color }} />
+      <span className="text-[#8A8FA3]">{label}</span>
+    </div>
+  );
+}
+
+function QuickStartCard({ title, description, gradient }: { title: string; description: string; gradient: string }) {
+  return (
+    <div className="glass-card rounded-xl p-5 text-left cursor-pointer hover:border-[#4F7FFF]/40 transition-all group">
+      <div className={`w-10 h-10 rounded-lg mb-3 bg-gradient-to-br ${gradient} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+        <Brain size={20} className="text-white" />
+      </div>
+      <h3 className="font-semibold text-[#E8EBF3] mb-1">{title}</h3>
+      <p className="text-xs text-[#8A8FA3]">{description}</p>
     </div>
   );
 }

@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Space_Grotesk } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Sento - Your Social Media AI Agent",
-  description: "AI Agents That Run Your Social Media",
+  title: "LendNova - AI-Powered Credit Scoring for First-Time Borrowers",
+  description: "Intelligent creditworthiness prediction using alternative data, ML models, and explainable AI. Fair, transparent, and secure credit decisions.",
+  keywords: ["credit scoring", "AI", "machine learning", "fintech", "creditworthiness", "fraud detection"],
 };
 
 export default function RootLayout({
@@ -24,10 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+    <html lang="en" className="scroll-smooth">
+      <body className={`${inter.variable} ${spaceGrotesk.variable} antialiased`}>
         {children}
         <Analytics />
       </body>
